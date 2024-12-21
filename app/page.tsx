@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Camera } from 'lucide-react';
+import { Camera, CameraOff, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function Home() {
@@ -10,15 +10,14 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [permissionState, setPermissionState] = useState<string>('prompt');
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Check permission status on component mount
   useEffect(() => {
     checkCameraPermission();
   }, []);
 
-  // Add effect to handle video stream
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
@@ -34,7 +33,6 @@ export default function Home() {
       const permission = await navigator.permissions.query({ name: 'camera' as PermissionName });
       setPermissionState(permission.state);
       
-      // Listen for permission changes
       permission.addEventListener('change', () => {
         setPermissionState(permission.state);
       });
@@ -51,9 +49,14 @@ export default function Home() {
         throw new Error('Your browser doesn\'t support camera access');
       }
 
+      // Stop any existing stream before starting a new one
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+
       const constraints = {
         video: {
-          facingMode: 'user',
+          facingMode: facingMode,
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
@@ -62,7 +65,6 @@ export default function Home() {
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(mediaStream);
 
-      // Remove the manual video setup since it's handled in the useEffect
       await checkCameraPermission();
       
     } catch (err) {
@@ -87,6 +89,13 @@ export default function Home() {
     }
   };
 
+  const toggleCamera = async () => {
+    setFacingMode(current => current === 'user' ? 'environment' : 'user');
+    if (stream) {
+      await startCamera();
+    }
+  };
+
   const stopCamera = () => {
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
@@ -97,7 +106,6 @@ export default function Home() {
     }
   };
 
-  // Rest of the code remains the same...
   const takePhoto = async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
@@ -159,7 +167,7 @@ export default function Home() {
   return (
     <main className="min-h-screen p-4 md:p-8 max-w-4xl mx-auto">
       <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8 text-center">
-        Interview Appearance Analyzer
+        Interview Analyzer
       </h1>
       
       <div className="space-y-4 md:space-y-6">
@@ -187,12 +195,26 @@ export default function Home() {
               <span>Start Camera</span>
             </button>
           ) : (
-            <button
-              onClick={stopCamera}
-              className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 w-full sm:w-auto"
-            >
-              Stop Camera
-            </button>
+            <>
+              <button
+                onClick={stopCamera}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 w-full sm:w-auto"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <CameraOff className="w-5 h-5" />
+                  <span>Stop Camera</span>
+                </span>
+              </button>
+              <button
+                onClick={toggleCamera}
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 w-full sm:w-auto"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <RefreshCw className="w-5 h-5" />
+                  <span>Switch Camera</span>
+                </span>
+              </button>
+            </>
           )}
           
           {stream && (
