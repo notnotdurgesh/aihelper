@@ -1,4 +1,3 @@
-// app/page.tsx
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -19,6 +18,17 @@ export default function Home() {
     checkCameraPermission();
   }, []);
 
+  // Add effect to handle video stream
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(err => {
+        console.error('Error playing video:', err);
+        setError('Failed to start video stream');
+      });
+    }
+  }, [stream]);
+
   const checkCameraPermission = async () => {
     try {
       const permission = await navigator.permissions.query({ name: 'camera' as PermissionName });
@@ -37,12 +47,10 @@ export default function Home() {
     try {
       setError('');
       
-      // First check if the browser supports getUserMedia
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Your browser doesn\'t support camera access');
       }
 
-      // Try to get camera access
       const constraints = {
         video: {
           facingMode: 'user',
@@ -54,17 +62,7 @@ export default function Home() {
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(mediaStream);
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        // Ensure video is loaded
-        await new Promise((resolve) => {
-          if (videoRef.current) {
-            videoRef.current.onloadedmetadata = resolve;
-          }
-        });
-      }
-
-      // Update permission state after successful access
+      // Remove the manual video setup since it's handled in the useEffect
       await checkCameraPermission();
       
     } catch (err) {
@@ -99,6 +97,7 @@ export default function Home() {
     }
   };
 
+  // Rest of the code remains the same...
   const takePhoto = async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
@@ -109,26 +108,21 @@ export default function Home() {
     if (!context) return;
 
     try {
-      // Make sure video is playing and has valid dimensions
       if (video.readyState !== video.HAVE_ENOUGH_DATA) {
         throw new Error('Video stream not ready');
       }
 
-      // Set canvas dimensions to match video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
-      // Draw video frame to canvas
       context.drawImage(video, 0, 0);
       
       setIsLoading(true);
       setAnalysis('');
       setError('');
       
-      // Convert canvas to base64
       const base64Image = canvas.toDataURL('image/jpeg', 0.8);
 
-      // Send to API
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
@@ -142,7 +136,6 @@ export default function Home() {
         throw new Error(errorData.error || 'Failed to analyze image');
       }
 
-      // Handle streaming response
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
 

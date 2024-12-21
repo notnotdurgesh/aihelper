@@ -7,16 +7,33 @@ const openai = new OpenAI({
 });
 
 export async function POST(req: Request) {
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: 'OpenAI API key is not configured' },
+      { status: 500 }
+    );
+  }
+
   try {
     const { image } = await req.json();
-    
+    console.log(image)
+    if (!image) {
+      return NextResponse.json(
+        { error: 'No image data provided' },
+        { status: 400 }
+      );
+    }
+
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o", // Corrected model name
       messages: [
         {
           role: "user",
           content: [
-            { type: "text", text: "please answer the question on this image as if you are in the interview in good way" },
+            { 
+              type: "text", 
+              text: "please analyze this question and answer as if you are giving an interview" 
+            },
             {
               type: "image_url",
               image_url: {
@@ -34,17 +51,25 @@ export async function POST(req: Request) {
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
-        for await (const chunk of response) {
-          const text = chunk.choices[0]?.delta?.content || '';
-          controller.enqueue(encoder.encode(text));
+        try {
+          for await (const chunk of response) {
+            const text = chunk.choices[0]?.delta?.content || '';
+            controller.enqueue(encoder.encode(text));
+          }
+        } catch (error) {
+          controller.error(error);
+        } finally {
+          controller.close();
         }
-        controller.close();
       },
     });
 
     return new NextResponse(stream);
   } catch (error) {
     console.error('Error:', error);
-    return NextResponse.json({ error: 'Failed to analyze image' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to analyze image' },
+      { status: 500 }
+    );
   }
 }
